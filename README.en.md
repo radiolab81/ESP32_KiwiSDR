@@ -167,6 +167,11 @@ idf.py menuconfig                # menu "KiwiSDR Client": Wi-Fi, host, frequency
 idf.py build flash monitor
 ```
 
+![mc1](/images/menuconfig1.jpg)
+
+![mc2](/images/menuconfig2.jpg)
+
+
 **Hardware:** audio on **GPIO25** (DAC1) and **GPIO26** (DAC2, same signal).
 Level 0…3.3 V around a midpoint of 1.65 V. For amplifiers/headphones:
 10 µF in series (removes the DC offset) and an RC low-pass filter against the
