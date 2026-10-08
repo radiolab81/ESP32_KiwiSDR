@@ -167,6 +167,11 @@ idf.py menuconfig                # Menü „KiwiSDR Client": WLAN, Host, Frequen
 idf.py build flash monitor
 ```
 
+![mc1](/images/menuconfig1.jpg)
+
+![mc2](/images/menuconfig2.jpg)
+
+
 **Hardware:** Audio an **GPIO25** (DAC1) und **GPIO26** (DAC2, gleiches Signal).
 Pegel 0…3,3 V um die Mittenspannung von 1,65 V. Für Verstärker/Kopfhörer:
 10 µF in Reihe (entfernt den Offset) und ein RC-Tiefpass gegen die
