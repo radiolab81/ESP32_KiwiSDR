@@ -1,0 +1,66 @@
+menu "KiwiSDR Client"
+
+    config KIWI_WIFI_SSID
+        string "WLAN SSID"
+        default "meine-ssid"
+
+    config KIWI_WIFI_PASSWORD
+        string "WLAN Passwort (leer = offenes WLAN)"
+        default ""
+
+    config KIWI_HOST
+        string "KiwiSDR Hostname / IPv4"
+        default "kiwisdr.adresse.org"
+
+    config KIWI_PORT
+        int "KiwiSDR Port"
+        default 8073
+        range 1 65535
+
+    config KIWI_PASSWORD
+        string "KiwiSDR Passwort (leer = oeffentlich)"
+        default ""
+
+    config KIWI_USER_NAME
+        string "Anzeigename in der Kiwi-Nutzerliste (nur A-Z a-z 0-9 _ -)"
+        default "esp32"
+
+    config KIWI_FREQ_KHZ
+        string "Startfrequenz in kHz (z. B. 225 oder 7055.5)"
+        default "225"
+
+    config KIWI_MODE
+        string "Demodulation (am amn amw sam usb lsb cw nbfm ...)"
+        default "am"
+
+    config KIWI_ADPCM
+        bool "ADPCM-Kompression anfordern (spart WLAN-Bandbreite)"
+        default n
+
+    config KIWI_STATUS_LOG
+        bool "Status alle 10 s automatisch loggen"
+        default n
+        help
+          Aus (Standard): Die Konsole bleibt beim Tippen ungestoert; den Status
+          zeigt der Befehl "s". An: zusaetzlich alle 10 s eine Logzeile mit
+          Frames, verlorenen Frames und DAC-Ueber-/Unterlaeufen.
+
+    config KIWI_DAC_GAIN
+        int "Software-Verstaerkung vor dem 8-Bit-DAC (1..8)"
+        default 2
+        range 1 8
+        help
+          Kiwi-Audio ist AGC-geregelt, aber oft leiser als Vollaussteuerung.
+          Zu hohe Werte uebersteuern (Verzerrung).
+
+    config KIWI_DAC_BUFFER_MS
+        int "Jitterpuffer in Millisekunden"
+        default 1000
+        range 200 4000
+
+    config KIWI_DAC_PREBUFFER_MS
+        int "Vorpufferung vor Wiedergabestart in Millisekunden"
+        default 400
+        range 100 2000
+
+endmenu
