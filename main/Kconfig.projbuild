@@ -63,4 +63,40 @@ menu "KiwiSDR Client"
         default 400
         range 100 2000
 
+    menu "Serververzeichnis (KiwiSDR-Liste)"
+
+        config KIWI_DIR_URL
+            string "URL der Serverliste (nur http://)"
+            default "http://rx.linkfanel.net/kiwisdr_com.js"
+            help
+              Maschinenlesbare Liste der oeffentlichen KiwiSDR-Server. Das Update
+              laedt sie (ca. 0,9 MB), zerlegt sie waehrend des Empfangs und legt
+              eine kompakte Datenbank im Flash ab. Ausgeloest wird es manuell
+              mit dem Konsolenbefehl "d update".
+
+        config KIWI_DIR_MIN_INTERVAL_S
+            int "Mindestabstand zwischen zwei Updates in Sekunden"
+            default 60
+            range 0 86400
+            help
+              Schont den Verzeichnisdienst und den Flash. "d update force"
+              umgeht die Sperre.
+
+        config KIWI_DIR_FAILOVER
+            bool "Bei nicht erreichbarem Server automatisch zu einem anderen wechseln"
+            default y
+            help
+              Meldet der Kiwi "too busy", "down", falsches Passwort usw. und es kam
+              noch kein Audio, wird der naechste passende Server aus der Datenbank
+              gewaehlt (Land/Filter aus "d filter" bleiben wirksam, nur Server mit
+              freiem Kanal). Ohne Datenbank passiert nichts.
+
+        config KIWI_DIR_FAILOVER_MAX
+            int "Maximale Wechsel hintereinander"
+            default 5
+            range 1 50
+            depends on KIWI_DIR_FAILOVER
+
+    endmenu
+
 endmenu

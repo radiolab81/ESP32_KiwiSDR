@@ -20,9 +20,12 @@ kiwi-esp32/
 │       ├── kiwi_adpcm.c            IMA-ADPCM-Dekoder
 │       ├── kiwi_client.c           KiwiSDR-Protokoll (Zustandsautomat)
 │       └── port_sockets.c          BSD-Sockets (Linux UND lwIP im ESP-IDF)
-├── main/                        <- nur ESP32: WLAN, DAC-Senke, Konsole
-├── pc/                          <- nur PC: main, WAV-Senke, Tests, Mock-Kiwi
-├── CMakeLists.txt, sdkconfig.defaults
+├── components/kiwi_dir/        <- portabler Verzeichnisdienst (Serverliste, DB, Auswahl), siehe Abschnitt 7
+│   ├── include/ + src/             Parser, HTTP-Client, Datenbank (A/B-Slots), Länder, d-Befehle
+│   └── tools/gen_geo_table.py      erzeugt die Länderkarte (src/kiwi_dir_geo_data.c)
+├── main/                        <- nur ESP32: WLAN, DAC-Senke, Konsole, Flash-Store, app_dir
+├── pc/                          <- nur PC: main, WAV-Senke, Tests, Mock-Kiwi, kiwi_dirtool
+├── CMakeLists.txt, sdkconfig.defaults, partitions.csv
 ```
 
 ---
@@ -258,15 +261,97 @@ keine breitbandige IQ-Auswertung). Es geht um Audio eines einzelnen Kanals.
 
 ---
 
-## 7 TODO
+## 7 Serververzeichnis: Liste laden, nach Land filtern, Server wechseln
 
-* [ ] **Automatischer Abgleich mit einem Verzeichnisdienst.**
-  Der Client soll regelmäßig eine öffentliche KiwiSDR-Liste abrufen und daraus
-  eine kleine interne Datenbank mit mehreren Kiwi-Servern pflegen
-  (z. B. in NVS/SPIFFS auf dem ESP32, Datei auf dem PC). Denkbare Inhalte pro Eintrag:
-  Host/Port, Standort, Frequenzbereich, freie Slots, Signalqualität, zuletzt erreichbar.
-  Nutzen: automatischer Wechsel zu einem anderen Kiwi bei `too_busy`/`down`,
-  Auswahl nach Standort oder Frequenzbereich, kein manuelles Pflegen der Hostliste.
-  Zu beachten: feste Anzahl von Einträgen (kein `malloc`), sparsame Abruf-Intervalle,
-  schlanker Parser statt vollständigem JSON-Baum, Fallback auf die zuletzt
-  gespeicherte Liste bei fehlendem Verzeichnisdienst.
+Der Client kennt die öffentlichen KiwiSDR-Server aus einem Verzeichnisdienst
+(Standard: `http://rx.linkfanel.net/kiwisdr_com.js`, ca. 0,9 MB, aktuell ~840 Server)
+und kann zur Laufzeit zwischen ihnen wechseln. Alles liegt in der eigenen Komponente
+`components/kiwi_dir`; `kiwi_core` (Protokoll, Audio, alter und neuer Pfad) ist unverändert.
+
+```
+ Netz ─► kiwi_dir_http ─► kiwi_dir_parse ─► Land bestimmen ─► kiwi_dir_db (Flash, Slot A/B)
+ (http)   GET, chunked,    Streaming,        Text + GPS        feste 120-Byte-Sätze,
+          Redirect         ~2,6 KB RAM                         Prüfsumme, Commit am Ende
+```
+
+### Bedienung (serielle Konsole bzw. `pc/kiwi_dirtool`)
+
+| Befehl | Wirkung |
+|---|---|
+| `d update` | Liste laden und Datenbank erneuern (`d update force` ignoriert den Mindestabstand) |
+| `d info` | Anzahl Server/Länder, Generation, aktueller Filter |
+| `d countries` | Länder mit Anzahl nutzbarer Server |
+| `d filter Germany` | nach Land filtern (auch Anfang: `d filter Ger`); sonstiger Text sucht in Name/Ort/Host; ohne Argument: Filter löschen |
+| `d free [off]`, `d snr 30`, `d freq 7055` | nur freie Kanäle · Mindest-SNR (dB) · Server, die diese Frequenz (kHz) abdecken |
+| `d list [Seite]` | Treffer anzeigen (10 pro Seite, mit Nummer `#n`) |
+| `d go 28` · `d go best` · `d go host:port` | zu Server Nr. 28 / dem besten Treffer (höchster SNR, freier Kanal) / beliebigem Host wechseln |
+
+Beispiel: `d update` → `d filter Switzerland` → `d list` → `d go 142`. Der Wechsel beendet die
+laufende Sitzung sauber und verbindet sofort neu (Frequenz und Modus bleiben). Der zuletzt mit
+`d go` gewählte Server wird in NVS gespeichert und gilt nach einem Neustart statt `KIWI_HOST`.
+
+**Failover** (Kconfig `KIWI_DIR_FAILOVER`, Standard an): meldet ein Kiwi `too_busy`, `down`, falsches
+Passwort o. Ä., bevor Audio kam, wird der nächste Treffer des aktuellen Filters mit freiem Kanal
+gewählt (max. 5 Versuche hintereinander, dazwischen 2 s Pause).
+
+### Daten und Speicher
+
+* **Gespeichert** wird je Server: Host, Port, Name, Ort, Land, Koordinaten, Nutzer/Kanäle, SNR (0–30 MHz
+  und 1,8–30 MHz), Empfangsbereich, Flags (offline/privat/https). Antennenbeschreibung, SDR-Hardware,
+  E-Mail u. Ä. werden bewusst verworfen. Ohne Port in der URL gilt **8073**.
+* **Flash:** Partition `kiwidb` (`partitions.csv`, 384 KB) mit **zwei Slots zu 192 KB** (fasst ~1500 Server,
+  heute werden ~840 gelistet). Das Update schreibt in den *inaktiven* Slot und schreibt zuletzt den
+  Header mit CRC-32 (= Commit). Abbruch, Stromausfall oder eine kaputte Liste lassen die alte Datenbank
+  unverändert. Der Slot wird erst beim ersten gültigen Server gelöscht (schlägt schon der Download fehl,
+  bleibt der Flash unberührt). Eine Liste mit weniger als einem Viertel der alten Einträge wird abgelehnt.
+* **RAM:** keine Datenbank im RAM, gelesen wird satzweise aus dem Flash. Während eines Updates belegt ein
+  Task ca. 9 KB Heap + 8 KB Stack, danach wird alles freigegeben.
+* **Politeness:** Updates nur manuell, Mindestabstand 60 s (`KIWI_DIR_MIN_INTERVAL_S`), eindeutiger
+  User-Agent. Während des Löschens (2–3 s) sind leichte Audioaussetzer möglich.
+* Der HTTP-Client kann nur `http://` (kein TLS); Server mit `https://`-Adresse werden gespeichert, aber
+  beim Filtern ausgeblendet und können nicht gewählt werden.
+
+### Länder: warum Text *und* Koordinaten?
+
+Das Feld `loc` des Dienstes ist **freier Text** („Stevensville, MT“, „ALPA CORRAL ARGENTINA“), kein
+Koordinatenfeld; die Koordinaten stehen in `gps` als `(Breite, Länge)`. Ein Land lässt sich daher nur
+teilweise aus dem Text lesen. `kiwi_dir_geo.c` kombiniert zwei Quellen:
+
+1. **Text:** bekannte Ländernamen und Aliase (UK, Deutschland, Holland, Azores …) als ganzes Wort in `loc`/`name`.
+2. **Koordinaten:** eine eingebaute 0,5°-Rasterkarte (13 KB Flash, erzeugt von `tools/gen_geo_table.py`
+   aus *Natural Earth 1:110m*, gemeinfrei; Genauigkeit ca. ±50 km an Grenzen).
+
+Bei Widerspruch gewinnt der Text nur, wenn das Land auch in ±1° um die Koordinaten liegt – so wird
+„Holland, MA“ zu *USA*, „Peru, IL“ zu *USA*, „Freital, Germany“ (Grenznähe) bleibt *Germany*.
+Auf der Liste vom 2. 11. 2026 stimmten Text und Raster bei 640 von 836 Servern überein, 162 hatten
+kein Land im Text, 24 widersprachen sich (alle korrekt aufgelöst), 5 Inselgruppen wurden als Alias ergänzt.
+Kleine Staaten, die im Raster fehlen (Singapore, Malta, Monaco …), werden nur über den Text erkannt.
+
+### Tests
+
+`make test` (im Ordner `pc/`) enthält jetzt zusätzlich `test_dir` (Parser Byte für Byte, Escapes/Unicode,
+Länder, Datenbank mit Flash-Nachbildung inkl. A/B-Wechsel, Abbruch, Beschädigung, Kapazität, Befehle) und
+`e2e_dir_test.py` (`kiwi_dirtool` gegen einen lokalen HTTP-Mock mit Redirect, `chunked`, Fehlerseiten,
+abgeschnittener Antwort, https-Umleitung, 2000 Servern). Ohne Netz ausprobieren:
+
+```sh
+cd pc && make
+./kiwi_dirtool -d kiwidb.bin -f testdata/kiwisdr_sample.js "d update" "d countries" "d filter Germany" "d list"
+./kiwi_dirtool -d kiwidb.bin "d update"      # echter Abruf von rx.linkfanel.net
+```
+
+**Bestehendes Projekt umstellen:** `sdkconfig.defaults` wirkt nur beim Erzeugen der `sdkconfig`. Für die neue
+Partitionstabelle also `idf.py fullclean`, `sdkconfig` löschen, `idf.py set-target esp32` – und einmal komplett
+flashen (`idf.py flash`), da sich die Partitionstabelle ändert.
+
+**Grenzen:** Reihenfolge und Auswahl folgen der Liste des Dienstes; Sind es einmal mehr als ~1500 Server, werden die
+überzähligen gezählt und verworfen. Kein automatisches Update (es gibt keine Uhr/SNTP) – nur auf Befehl.
+
+---
+
+## 8 TODO
+
+* [x] ~~Automatischer Abgleich mit einem Verzeichnisdienst~~ – umgesetzt in Abschnitt 7 (manuelles Update,
+  Länderfilter, Wechsel zur Laufzeit, Failover).
+* [ ] Zeitgesteuertes Update (z. B. täglich nach SNTP-Zeit) und „zuletzt erreichbar“-Statistik je Server.
+* [ ] `https://`/`wss://` (TLS) für Kiwis, die nur verschlüsselt erreichbar sind.

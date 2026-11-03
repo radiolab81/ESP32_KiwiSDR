@@ -20,9 +20,12 @@ kiwi-esp32/
 │       ├── kiwi_adpcm.c            IMA-ADPCM decoder
 │       ├── kiwi_client.c           KiwiSDR protocol (state machine)
 │       └── port_sockets.c          BSD sockets (Linux AND lwIP in ESP-IDF)
-├── main/                        <- ESP32 only: Wi-Fi, DAC sink, console
-├── pc/                          <- PC only: main, WAV sink, tests, mock Kiwi
-├── CMakeLists.txt, sdkconfig.defaults
+├── components/kiwi_dir/        <- portable directory service (server list, DB, selection), see section 7
+│   ├── include/ + src/             parser, HTTP client, database (A/B slots), countries, d-commands
+│   └── tools/gen_geo_table.py      generates the country map (src/kiwi_dir_geo_data.c)
+├── main/                        <- ESP32 only: Wi-Fi, DAC sink, console, flash store, app_dir
+├── pc/                          <- PC only: main, WAV sink, tests, mock Kiwi, kiwi_dirtool
+├── CMakeLists.txt, sdkconfig.defaults, partitions.csv
 ```
 
 ---
@@ -256,14 +259,97 @@ wideband IQ processing). It is about the audio of a single channel.
 
 ---
 
-## 7 TODO
+## 7 Server directory: load the list, filter by country, switch servers
 
-* [ ] **Automatic synchronisation with a directory service.**
-  The client should periodically fetch a public KiwiSDR list and use it to maintain
-  a small internal database of multiple Kiwi servers (e.g. in NVS/SPIFFS on the ESP32,
-  a file on the PC). Possible fields per entry: host/port, location, frequency range,
-  free slots, signal quality, last reachable. Benefits: automatic failover to another
-  Kiwi on `too_busy`/`down`, selection by location or frequency range, no manual
-  upkeep of the host list. Points to consider: fixed number of entries (no `malloc`),
-  conservative polling intervals, a lean parser instead of a full JSON tree, and a
-  fallback to the last stored list if the directory service is unavailable.
+The client knows the public KiwiSDR servers from a directory service
+(default: `http://rx.linkfanel.net/kiwisdr_com.js`, ~0.9 MB, currently ~840 servers) and can switch
+between them at runtime. Everything lives in its own component `components/kiwi_dir`; `kiwi_core`
+(protocol, audio, old and new path) is unchanged.
+
+```
+ network ─► kiwi_dir_http ─► kiwi_dir_parse ─► resolve country ─► kiwi_dir_db (flash, slot A/B)
+ (http)     GET, chunked,    streaming,         text + GPS          fixed 120-byte records,
+            redirects        ~2.6 KB RAM                            checksum, commit at the end
+```
+
+### Usage (serial console or `pc/kiwi_dirtool`)
+
+| Command | Effect |
+|---|---|
+| `d update` | download the list and renew the database (`d update force` ignores the minimum interval) |
+| `d info` | servers/countries, generation, current filter |
+| `d countries` | countries with number of usable servers |
+| `d filter Germany` | filter by country (prefix works: `d filter Ger`); other text searches name/place/host; no argument clears the filter |
+| `d free [off]`, `d snr 30`, `d freq 7055` | only free channels · minimum SNR (dB) · servers covering this frequency (kHz) |
+| `d list [page]` | show matches (10 per page, numbered `#n`) |
+| `d go 28` · `d go best` · `d go host:port` | switch to server no. 28 / the best match (highest SNR, free channel) / any host |
+
+Example: `d update` → `d filter Switzerland` → `d list` → `d go 142`. A switch ends the running session
+cleanly and reconnects immediately (frequency and mode are kept). The last server chosen with `d go` is
+stored in NVS and used after a reboot instead of `KIWI_HOST`.
+
+**Failover** (Kconfig `KIWI_DIR_FAILOVER`, on by default): if a Kiwi reports `too_busy`, `down`, wrong
+password etc. before any audio arrived, the next match of the current filter with a free channel is used
+(max. 5 in a row, 2 s pause between them).
+
+### Data and storage
+
+* **Stored** per server: host, port, name, place, country, coordinates, users/channels, SNR (0–30 MHz and
+  1.8–30 MHz), receive range, flags (offline/private/https). Antenna text, SDR hardware, e-mail etc. are
+  dropped on purpose. A URL without port means **8073**.
+* **Flash:** partition `kiwidb` (`partitions.csv`, 384 KB) with **two 192 KB slots** (~1500 servers; ~840 are
+  listed today). An update writes into the *inactive* slot and writes the header with a CRC-32 last
+  (= commit). Abort, power loss or a broken list leave the old database untouched. The slot is erased only
+  when the first valid server arrives (if the download fails early the flash is not touched). A list with
+  fewer than a quarter of the old entries is rejected.
+* **RAM:** no database in RAM, records are read from flash one at a time. During an update a task uses about
+  9 KB heap + 8 KB stack, all freed afterwards.
+* **Politeness:** manual updates only, 60 s minimum interval (`KIWI_DIR_MIN_INTERVAL_S`), a clear User-Agent.
+  Slight audio dropouts are possible during the 2–3 s erase.
+* The HTTP client does `http://` only (no TLS); servers with an `https://` address are stored but hidden
+  by the filter and cannot be selected.
+
+### Countries: why text *and* coordinates?
+
+The directory's `loc` field is **free text** ("Stevensville, MT", "ALPA CORRAL ARGENTINA"), not a
+coordinate field; coordinates are in `gps` as `(lat, lon)`. A country can only partly be read from the
+text, so `kiwi_dir_geo.c` combines two sources:
+
+1. **Text:** known country names and aliases (UK, Deutschland, Holland, Azores …) as a whole word in `loc`/`name`.
+2. **Coordinates:** a built-in 0.5° raster map (13 KB flash, generated by `tools/gen_geo_table.py` from
+   *Natural Earth 1:110m*, public domain; about ±50 km accuracy at borders).
+
+On conflict the text only wins if that country is also within ±1° of the coordinates, so "Holland, MA" and
+"Peru, IL" become *USA*, while "Freital, Germany" (near the border) stays *Germany*. On the 2 Nov 2026 list,
+text and raster agreed for 640 of 836 servers, 162 had no country in the text, 24 disagreed (all resolved
+correctly) and 5 island groups were added as aliases. Small states missing from the raster (Singapore, Malta,
+Monaco …) are recognised from the text only.
+
+### Tests
+
+`make test` (in `pc/`) now also runs `test_dir` (byte-by-byte parser, escapes/unicode, countries, database on
+a flash emulation incl. A/B swap, abort, corruption, capacity, commands) and `e2e_dir_test.py`
+(`kiwi_dirtool` against a local HTTP mock with redirect, `chunked`, error pages, truncated reply, https
+redirect, 2000 servers). Try it offline:
+
+```sh
+cd pc && make
+./kiwi_dirtool -d kiwidb.bin -f testdata/kiwisdr_sample.js "d update" "d countries" "d filter Germany" "d list"
+./kiwi_dirtool -d kiwidb.bin "d update"      # real download from rx.linkfanel.net
+```
+
+**Upgrading an existing project:** `sdkconfig.defaults` only applies when `sdkconfig` is generated. For the new
+partition table run `idf.py fullclean`, delete `sdkconfig`, `idf.py set-target esp32` – and flash everything once
+(`idf.py flash`), since the partition table changes.
+
+**Limits:** order and selection follow the directory's list; if it ever exceeds ~1500 servers the surplus is
+counted and dropped. No automatic update (there is no clock/SNTP) – on command only.
+
+---
+
+## 8 TODO
+
+* [x] ~~Automatic synchronisation with a directory service~~ – done in section 7 (manual update,
+  country filter, runtime switching, failover).
+* [ ] Scheduled update (e.g. daily using SNTP time) and per-server "last reachable" statistics.
+* [ ] `https://`/`wss://` (TLS) for Kiwis reachable only encrypted.

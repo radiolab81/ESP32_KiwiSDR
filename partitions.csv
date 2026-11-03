@@ -1,0 +1,11 @@
+# Name,     Type, SubType, Offset,   Size,     Flags
+# Partitionstabelle fuer den KiwiSDR-Client (2 MB Flash genuegt).
+#
+# kiwidb = Serverdatenbank des Verzeichnisdienstes (components/kiwi_dir):
+#          zwei Slots (A/B) zu je 192 KB, damit ein Update die alte Liste nie
+#          zerstoert. Passt ca. 1500 Server (der Dienst listet heute ca. 840).
+#          SubType 0x40 = frei waehlbarer "Custom"-Typ (>= 0x40).
+nvs,        data, nvs,     0x9000,   0x6000,
+phy_init,   data, phy,     0xf000,   0x1000,
+factory,    app,  factory, 0x10000,  0x100000,
+kiwidb,     data, 0x40,    0x110000, 0x60000,
