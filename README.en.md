@@ -1,4 +1,4 @@
-# KiwiSDR Client for ESP32 and PC
+# KiwiSDR Client for ESP32, Pico W (RP2040), Pico 2 W (RP2350) and PC
 
 [Deutsch](README.md) · **English**
 
@@ -6,6 +6,7 @@ Portable C code (C11) that connects to a KiwiSDR, sets frequency and
 demodulation mode (AM among others), receives the audio stream and outputs it as PCM:
 
 * **ESP32 (classic, ESP-IDF 6.1):** via the internal 8-bit DAC (GPIO25/GPIO26)
+* **Pico W / Pico 2W:** see [Readme](/pico/README.md)
 * **PC (Linux/macOS):** to a WAV file (or raw to stdout, e.g. for `aplay`)
 
 The protocol core is **the same source code** on both platforms.
@@ -25,6 +26,7 @@ kiwi-esp32/
 │   └── tools/gen_geo_table.py      generates the country map (src/kiwi_dir_geo_data.c)
 ├── main/                        <- ESP32 only: Wi-Fi, DAC sink, console, flash store, app_dir
 ├── pc/                          <- PC only: main, WAV sink, tests, mock Kiwi, kiwi_dirtool
+├── pico/                        <- Pico W/2W only: Wi-Fi, DAC sink, console, flash store, app_dir
 ├── CMakeLists.txt, sdkconfig.defaults, partitions.csv
 ```
 
@@ -190,6 +192,12 @@ staircase steps. The DAC has only 8 bits, so quantization noise is audible
   switches to silence and pre-buffers again; the counters are logged every 10 s.
 * Reconnect with back-off delays of 5 → 10 → 20 → 40 → 60 s so as not to
   "hammer" the server. The last frequency and mode that were set are retained.
+
+---
+
+## 4.1 Raspberry Pico W / Pico 2 W: Build
+
+see [Readme](/pico/README.md)
 
 ---
 
