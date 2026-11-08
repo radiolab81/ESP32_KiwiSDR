@@ -1,0 +1,45 @@
+/* Automatisch aus CMake erzeugt (pico/CMakeLists.txt) - NICHT von Hand aendern und nicht einchecken
+ * (enthaelt ggf. Passwoerter). Die Namen entsprechen den CONFIG_KIWI_*-Symbolen des ESP-IDF-Projekts
+ * (main/Kconfig.projbuild); das DAC-Audio heisst hier CONFIG_KIWI_AUDIO_*. */
+#ifndef KIWI_CONFIG_H
+#define KIWI_CONFIG_H
+
+#define CONFIG_KIWI_WIFI_SSID        "@KIWI_WIFI_SSID_C@"
+#define CONFIG_KIWI_WIFI_PASSWORD    "@KIWI_WIFI_PASSWORD_C@"
+#define CONFIG_KIWI_WIFI_COUNTRY     CYW43_COUNTRY('@KIWI_WIFI_COUNTRY_1@', '@KIWI_WIFI_COUNTRY_2@', 0)
+#define CONFIG_KIWI_HOST             "@KIWI_HOST_C@"
+#define CONFIG_KIWI_PORT             @KIWI_PORT@
+#define CONFIG_KIWI_PASSWORD         "@KIWI_PASSWORD_C@"
+#define CONFIG_KIWI_USER_NAME        "@KIWI_USER_NAME_C@"
+#define CONFIG_KIWI_FREQ_KHZ         "@KIWI_FREQ_KHZ_C@"
+#define CONFIG_KIWI_MODE             "@KIWI_MODE_C@"
+#cmakedefine KIWI_ADPCM
+#ifdef KIWI_ADPCM
+#define CONFIG_KIWI_ADPCM 1
+#endif
+#cmakedefine KIWI_STATUS_LOG
+#ifdef KIWI_STATUS_LOG
+#define CONFIG_KIWI_STATUS_LOG 1
+#endif
+
+#define CONFIG_KIWI_AUDIO_PIN          @KIWI_AUDIO_PIN@
+#define CONFIG_KIWI_AUDIO_GAIN         @KIWI_AUDIO_GAIN@
+#define CONFIG_KIWI_AUDIO_BUFFER_MS    @KIWI_AUDIO_BUFFER_MS@
+#define CONFIG_KIWI_AUDIO_PREBUFFER_MS @KIWI_AUDIO_PREBUFFER_MS@
+
+#define CONFIG_KIWI_DIR_URL            "@KIWI_DIR_URL_C@"
+#define CONFIG_KIWI_DIR_MIN_INTERVAL_S @KIWI_DIR_MIN_INTERVAL_S@
+#cmakedefine KIWI_DIR_FAILOVER
+#ifdef KIWI_DIR_FAILOVER
+#define CONFIG_KIWI_DIR_FAILOVER 1
+#endif
+#define CONFIG_KIWI_DIR_FAILOVER_MAX   @KIWI_DIR_FAILOVER_MAX@
+#define CONFIG_KIWI_DIR_SLOT_KB        @KIWI_DIR_SLOT_KB@
+
+#cmakedefine KIWI_WIFI_NO_POWERSAVE
+#ifdef KIWI_WIFI_NO_POWERSAVE
+#define CONFIG_KIWI_WIFI_NO_POWERSAVE 1
+#endif
+#define CONFIG_KIWI_WATCHDOG_MS        @KIWI_WATCHDOG_MS@
+
+#endif /* KIWI_CONFIG_H */
