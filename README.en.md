@@ -6,7 +6,7 @@ Portable C code (C11) that connects to a KiwiSDR, sets frequency and
 demodulation mode (AM among others), receives the audio stream and outputs it as PCM:
 
 * **ESP32 (classic, ESP-IDF 6.1):** via the internal 8-bit DAC (GPIO25/GPIO26)
-* **Pico W / Pico 2W:** see [Readme](/pico/README.md)
+* **Pico W / Pico 2W:** see [Readme](/pico/README.en.md)
 * **PC (Linux/macOS):** to a WAV file (or raw to stdout, e.g. for `aplay`)
 
 The protocol core is **the same source code** on both platforms.
@@ -197,7 +197,7 @@ staircase steps. The DAC has only 8 bits, so quantization noise is audible
 
 ## 4.1 Raspberry Pico W / Pico 2 W: Build
 
-see [Readme](/pico/README.md)
+see [Readme](/pico/README.en.md)
 
 ---
 
