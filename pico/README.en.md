@@ -55,7 +55,7 @@ new: `h` (heap/stack).
 * **Verified:** compiles and links for `pico_w` and `pico2_w` without warnings 
   (SDK 2.1.1, FreeRTOS V11.3.3, GCC 13.2); several configuration variants; original files
   byte-identical. 
-* **Verified:** long-term operation, real hardware (Pico W/2040, WLAN, PWM/DMA-audio, flash-r/w).
+* **Verified:** long-term operation, real hardware (Pico W/2040, Wi-Fi, PWM/DMA-audio, flash-r/w).
 * **Limitations:** the PWM clock of 125 MHz / 2604 corresponds to 48003 Hz (RP2040), i.e. marginally
   faster than 4 × 12 kHz; the jitter buffer absorbs the drift. While a flash sector is being erased
   (45–400 ms) the CPU stalls; the DMA ring bridges about 64 ms.
