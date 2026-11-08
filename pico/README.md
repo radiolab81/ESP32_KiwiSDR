@@ -31,6 +31,7 @@ cp pico/kiwi_secrets.cmake.example pico/kiwi_secrets.cmake      # WLAN-Daten ein
 cmake -S pico -B build-pico  -G Ninja -DPICO_BOARD=pico_w  -DKIWI_HOST=mein.kiwi.org
 cmake -S pico -B build-pico2 -G Ninja -DPICO_BOARD=pico2_w
 cmake --build build-pico      # -> build-pico/kiwi_pico.uf2 (BOOTSEL-Laufwerk kopieren)
+screen /dev/ttyACM0 115200    # Monitor und Steuerung
 ```
 Weitere Optionen: `KIWI_FREQ_KHZ`, `KIWI_MODE`, `KIWI_ADPCM`, `KIWI_AUDIO_PIN/GAIN/BUFFER_MS`,
 `KIWI_WIFI_COUNTRY`, `KIWI_WATCHDOG_MS`, `KIWI_DIR_*` (siehe `CMakeLists.txt`).
