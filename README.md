@@ -362,6 +362,18 @@ Zeigt das **aktuelle** Spektrum um die Abstimmfrequenz (Standard 50 kHz breit = 
 kleinen Display – ohne Wasserfall-Historie, nur zur Orientierung im Band. Standardmäßig **aus**; dann ist kein
 zusätzlicher Displaycode im Image.
 
+
+*PC Version/Simulation*
+
+![PCSIM1](/images/pcsim_ssd1306_spec.jpg)
+![PCSIM2](/images/pcsim_st7735_spec.jpg)
+
+*Real MCU/Display*
+
+![REAL1](/images/real_SSD1306.jpg)
+![REAL2](/images/real_ST7735.jpg)
+
+
 | Ziel | Einschalten | Pins/Display |
 |---|---|---|
 | ESP32 | `idf.py menuconfig` → *KiwiSDR Client* → *Spektrumanzeige* | Kconfig (`KIWI_SPEC_*`) |
@@ -391,8 +403,9 @@ Alles Neue liegt in `components/kiwi_disp/`, `main/spec_hal_esp32.c`, `pico/spec
 **Getestet (PC):** `make test` – 74 Modultest-Prüfungen (`test_spec`: Zustand, Autoskalierung, Renderer, beide
 Treiber inkl. SPI/I2C/SH1106-/ST7735-Versatz gegen simulierte Panels, die die echten Busbytes dekodieren,
 Fehlerpfade) und ein End-to-End-Test (`e2e_wf_test.py`: gleicher Zeitstempel, Zoom/Start, ADPCM, Trägerposition
-im Bild, Umstimmen, Ablehnung ohne Audio-Störung). *
+im Bild, Umstimmen, Ablehnung ohne Audio-Störung). 
 **Live getestet:** reale ESP32-/Pico-Hardware: jeweils Headless, SSD1306 I2C, ST7735 mit verschiedenen KiwiSDR Servern
+
 ---
 
 ## 8 TODO
