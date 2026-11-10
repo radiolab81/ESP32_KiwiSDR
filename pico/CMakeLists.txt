@@ -82,6 +82,37 @@ set(KIWI_DIR_MIN_INTERVAL_S "60"  CACHE STRING "Mindestabstand zwischen zwei Ver
 option(KIWI_DIR_FAILOVER    "Bei nicht erreichbarem Server automatisch wechseln" ON)
 set(KIWI_DIR_FAILOVER_MAX   "5"   CACHE STRING "Maximale Wechsel hintereinander")
 
+# --- Optionale Spektrumanzeige (SSD1306 / SH1106 / ST7735). AUS = kein zusaetzlicher Code im Image. ---
+# ACHTUNG: Viele KiwiSDR-Server lehnen eine zweite Verbindung derselben IP ab. Das ist unkritisch
+# (Audio laeuft weiter, Anzeige "NO DATA", kein erneuter Versuch in dieser Sitzung), siehe README.
+option(KIWI_SPEC              "Spektrum um die Abstimmfrequenz auf einem kleinen Display anzeigen (zweiter WebSocket /W/F)" OFF)
+set(KIWI_SPEC_PANEL           "ssd1306_i2c" CACHE STRING "Display: ssd1306_i2c | ssd1306_spi | st7735")
+set(KIWI_SPEC_WIDTH           "128"  CACHE STRING "Anzeigebreite in Pixeln (32..160)")
+set(KIWI_SPEC_HEIGHT          "64"   CACHE STRING "Anzeigehoehe in Pixeln (SSD1306: 32 oder 64; ST7735 z. B. 128/160; mindestens 32)")
+set(KIWI_SPEC_XOFF            "0"    CACHE STRING "ST7735: X-Versatz im Controller-RAM (z. B. 2 bei 128x160 Red Tab)")
+set(KIWI_SPEC_YOFF            "0"    CACHE STRING "ST7735: Y-Versatz im Controller-RAM (z. B. 1 bei 128x160 Red Tab)")
+set(KIWI_SPEC_SPAN_KHZ        "50"   CACHE STRING "Dargestellte Gesamtbreite in kHz (50 = +-25 kHz, 100 = +-50 kHz)")
+set(KIWI_SPEC_FPS             "5"    CACHE STRING "Anzeige-Wiederholrate (1..20)")
+set(KIWI_SPEC_WF_SPEED        "2"    CACHE STRING "Kiwi-Zeilenrate 1..4 (1 = ca. 1/s, 4 = Maximum)")
+set(KIWI_SPEC_SMOOTH          "1"    CACHE STRING "Glaettung 0..3")
+set(KIWI_SPEC_DBM_LO          "-110" CACHE STRING "Fester Bereich unten (dBm), nur ohne KIWI_SPEC_AUTOSCALE")
+set(KIWI_SPEC_DBM_HI          "-20"  CACHE STRING "Fester Bereich oben (dBm), nur ohne KIWI_SPEC_AUTOSCALE")
+option(KIWI_SPEC_AUTOSCALE    "Pegelbereich automatisch an Rauschteppich und Spitzen anpassen" ON)
+option(KIWI_SPEC_ROTATE180    "Bild um 180 Grad drehen (nur SSD1306-Typen)" OFF)
+option(KIWI_SPEC_SH1106       "SH1106-Controller (Spaltenversatz 2; nur SSD1306-Typen)" OFF)
+option(KIWI_SPEC_ST7735_INVERT "ST7735: Farben invertieren" OFF)
+set(KIWI_SPEC_BUS_HZ          "400000" CACHE STRING "Bustakt in Hz (I2C 400000; SPI bis ca. 20000000)")
+set(KIWI_SPEC_I2C_INST        "0"    CACHE STRING "I2C-Block 0 oder 1")
+set(KIWI_SPEC_I2C_ADDR        "0x3C" CACHE STRING "I2C-Adresse (7 Bit): 0x3C oder 0x3D")
+set(KIWI_SPEC_PIN_SDA         "4"    CACHE STRING "I2C SDA (GPIO; GP4 = i2c0-SDA)")
+set(KIWI_SPEC_PIN_SCL         "5"    CACHE STRING "I2C SCL (GPIO; GP5 = i2c0-SCL)")
+set(KIWI_SPEC_SPI_INST        "0"    CACHE STRING "SPI-Block 0 oder 1")
+set(KIWI_SPEC_PIN_SCLK        "18"   CACHE STRING "SPI SCK (GPIO; spi0: 2,6,18,22 / spi1: 10,14,26)")
+set(KIWI_SPEC_PIN_MOSI        "19"   CACHE STRING "SPI MOSI/SDA (GPIO; spi0: 3,7,19,23 / spi1: 11,15,27)")
+set(KIWI_SPEC_PIN_CS          "17"   CACHE STRING "SPI CS (GPIO)")
+set(KIWI_SPEC_PIN_DC          "20"   CACHE STRING "SPI D/C (GPIO)")
+set(KIWI_SPEC_PIN_RST         "21"   CACHE STRING "Reset (GPIO, -1 = nicht angeschlossen)")
+
 option(KIWI_WIFI_NO_POWERSAVE "WLAN-Energiesparmodus aus (weniger Jitter, wie WIFI_PS_NONE im ESP32-Projekt)" ON)
 set(KIWI_WATCHDOG_MS        "8000" CACHE STRING "Hardware-Watchdog in ms (0 = aus). Startet bei Haenger/Absturz neu.")
 option(KIWI_STDIO_USB       "Konsole ueber USB (CDC)" ON)
@@ -104,6 +135,62 @@ endif()
 math(EXPR _slot_mod "${KIWI_DIR_SLOT_KB} % 4")
 if(_slot_mod OR KIWI_DIR_SLOT_KB LESS 64)
     message(FATAL_ERROR "KIWI_DIR_SLOT_KB muss ein Vielfaches von 4 und >= 64 sein")
+endif()
+if(KIWI_SPEC)
+    if(NOT KIWI_SPEC_PANEL MATCHES "^(ssd1306_i2c|ssd1306_spi|st7735)$")
+        message(FATAL_ERROR "KIWI_SPEC_PANEL muss ssd1306_i2c, ssd1306_spi oder st7735 sein, ist: ${KIWI_SPEC_PANEL}")
+    endif()
+    string(TOUPPER "${KIWI_SPEC_PANEL}" KIWI_SPEC_PANEL_UP)
+    foreach(_v KIWI_SPEC_WIDTH KIWI_SPEC_HEIGHT KIWI_SPEC_XOFF KIWI_SPEC_YOFF KIWI_SPEC_SPAN_KHZ KIWI_SPEC_FPS
+               KIWI_SPEC_WF_SPEED KIWI_SPEC_SMOOTH KIWI_SPEC_BUS_HZ KIWI_SPEC_I2C_INST KIWI_SPEC_SPI_INST
+               KIWI_SPEC_PIN_SDA KIWI_SPEC_PIN_SCL KIWI_SPEC_PIN_SCLK KIWI_SPEC_PIN_MOSI KIWI_SPEC_PIN_CS KIWI_SPEC_PIN_DC)
+        if(NOT ${_v} MATCHES "^[0-9]+$")
+            message(FATAL_ERROR "${_v}=${${_v}} ungueltig (nichtnegative Ganzzahl erwartet)")
+        endif()
+    endforeach()
+    foreach(_v KIWI_SPEC_DBM_LO KIWI_SPEC_DBM_HI KIWI_SPEC_PIN_RST)
+        if(NOT ${_v} MATCHES "^-?[0-9]+$")
+            message(FATAL_ERROR "${_v}=${${_v}} ungueltig (Ganzzahl erwartet)")
+        endif()
+    endforeach()
+    if(KIWI_SPEC_WIDTH LESS 32 OR KIWI_SPEC_WIDTH GREATER 160 OR KIWI_SPEC_HEIGHT LESS 32 OR KIWI_SPEC_HEIGHT GREATER 160)
+        message(FATAL_ERROR "KIWI_SPEC_WIDTH/HEIGHT muessen 32..160 sein")
+    endif()
+    if(NOT KIWI_SPEC_PANEL STREQUAL "st7735" AND NOT (KIWI_SPEC_HEIGHT EQUAL 32 OR KIWI_SPEC_HEIGHT EQUAL 64))
+        message(FATAL_ERROR "SSD1306: KIWI_SPEC_HEIGHT muss 32 oder 64 sein")
+    endif()
+    if(KIWI_SPEC_FPS LESS 1 OR KIWI_SPEC_FPS GREATER 20 OR KIWI_SPEC_WF_SPEED LESS 1 OR KIWI_SPEC_WF_SPEED GREATER 4 OR KIWI_SPEC_SMOOTH GREATER 3)
+        message(FATAL_ERROR "KIWI_SPEC_FPS 1..20, KIWI_SPEC_WF_SPEED 1..4, KIWI_SPEC_SMOOTH 0..3")
+    endif()
+    if(NOT KIWI_SPEC_I2C_ADDR MATCHES "^0x3[CD]$")
+        message(FATAL_ERROR "KIWI_SPEC_I2C_ADDR muss 0x3C oder 0x3D sein")
+    endif()
+    foreach(_v KIWI_SPEC_I2C_INST KIWI_SPEC_SPI_INST)
+        if(${_v} GREATER 1)
+            message(FATAL_ERROR "${_v} muss 0 oder 1 sein")
+        endif()
+    endforeach()
+    # GPIO23..25 und 29 gehoeren dem WLAN-Chip, KIWI_AUDIO_PIN (+1) dem PWM-Audio
+    if(KIWI_SPEC_PANEL STREQUAL "ssd1306_i2c")
+        set(_spec_pins ${KIWI_SPEC_PIN_SDA} ${KIWI_SPEC_PIN_SCL})
+    else()
+        set(_spec_pins ${KIWI_SPEC_PIN_SCLK} ${KIWI_SPEC_PIN_MOSI} ${KIWI_SPEC_PIN_CS} ${KIWI_SPEC_PIN_DC})
+        if(NOT KIWI_SPEC_PIN_RST LESS 0)
+            list(APPEND _spec_pins ${KIWI_SPEC_PIN_RST})
+        endif()
+    endif()
+    math(EXPR _audio_pin2 "${KIWI_AUDIO_PIN} + 1")
+    foreach(_p ${_spec_pins})
+        if(_p GREATER 28 OR (_p GREATER 22 AND _p LESS 26) OR _p EQUAL ${KIWI_AUDIO_PIN} OR _p EQUAL ${_audio_pin2})
+            message(FATAL_ERROR "Spektrum-Pin GPIO${_p} nicht nutzbar (WLAN-Chip: 23-25,29; Audio: ${KIWI_AUDIO_PIN}/${_audio_pin2})")
+        endif()
+    endforeach()
+    list(LENGTH _spec_pins _n_pins)
+    list(REMOVE_DUPLICATES _spec_pins)
+    list(LENGTH _spec_pins _n_uniq)
+    if(NOT _n_pins EQUAL _n_uniq)
+        message(FATAL_ERROR "Spektrum-Pins muessen verschieden sein")
+    endif()
 endif()
 string(REGEX MATCH "^[0-9]+$" _ok "${KIWI_PORT}")
 if(NOT _ok OR KIWI_PORT LESS 1 OR KIWI_PORT GREATER 65535)
@@ -150,11 +237,26 @@ add_executable(kiwi_pico
     main_pico.c          # Port von main/app_main.c
 )
 
+# --- Optionale Spektrumanzeige: portabler Teil unveraendert aus components/kiwi_disp ---
+if(KIWI_SPEC)
+    target_sources(kiwi_pico PRIVATE
+        ${KIWI_ROOT}/components/kiwi_disp/src/kiwi_wf.c
+        ${KIWI_ROOT}/components/kiwi_disp/src/kiwi_spec.c
+        ${KIWI_ROOT}/components/kiwi_disp/src/kiwi_spec_draw.c
+        ${KIWI_ROOT}/components/kiwi_disp/src/kiwi_disp.c
+        ${KIWI_ROOT}/components/kiwi_disp/src/disp_ssd1306.c
+        ${KIWI_ROOT}/components/kiwi_disp/src/disp_st7735.c
+        ${KIWI_ROOT}/components/kiwi_disp/src/kiwi_spec_app.c
+        spec_hal_pico.c      # I2C/SPI/GPIO ueber das Pico-SDK
+    )
+endif()
+
 target_include_directories(kiwi_pico PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}                       # FreeRTOSConfig.h, lwipopts.h, klog.h ...
     ${CMAKE_CURRENT_BINARY_DIR}/generated           # kiwi_config.h
     ${KIWI_ROOT}/components/kiwi_core/include
     ${KIWI_ROOT}/components/kiwi_dir/include
+    ${KIWI_ROOT}/components/kiwi_disp/include
 )
 
 # FreeRTOS braucht FreeRTOSConfig.h (liegt in diesem Ordner).
@@ -184,6 +286,9 @@ target_link_libraries(kiwi_pico PRIVATE
     hardware_watchdog
     hardware_clocks
     hardware_irq
+    hardware_i2c                             # nur fuer KIWI_SPEC noetig, aber ohne Kosten (wird sonst weggelinkt)
+    hardware_spi
+    hardware_gpio
 )
 
 pico_enable_stdio_usb(kiwi_pico  $<IF:$<BOOL:${KIWI_STDIO_USB}>,1,0>)

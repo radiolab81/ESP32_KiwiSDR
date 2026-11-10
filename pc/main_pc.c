@@ -12,6 +12,9 @@
  *     -c          ADPCM-Kompression anfordern (Standard: rohes PCM)
  *     -w PASSWORT Kiwi-Passwort
  *     -l          alter Pfad "/<ts>/SND" statt "/ws/kiwi/<ts>/SND" (Kiwi < v1.9xx)
+ *     -D PANEL    Spektrum auf simuliertem Display (zweiter WebSocket /W/F): ssd1306 | ssd1306spi | st7735
+ *     -S KHZ      dargestellte Breite in kHz (Standard 50 = +-25 kHz)
+ *     -P DATEI    letztes Anzeigebild als PPM schreiben      -W   Anzeige im Terminal zeichnen
  *     -i          interaktiv: Befehle von stdin (f 1000 / m usb / s / q);
  *                 dabei keine automatische Statuszeile (Status mit 's')
  *
@@ -27,6 +30,7 @@
 
 #include "kiwi_client.h"
 #include "sink_wav.h"
+#include "spec_pc.h"
 
 static volatile sig_atomic_t g_stop = 0;
 static void on_signal(int sig) { (void)sig; g_stop = 1; }
@@ -39,9 +43,12 @@ int main(int argc, char **argv)
     unsigned port = 8073;
     uint32_t freq_hz = 225000;
     unsigned secs = 10;
-    int compression = 0, interactive = 0, legacy = 0, opt;
+    int compression = 0, interactive = 0, legacy = 0, term = 0, opt;
+    const char *panel = NULL, *ppm = NULL;
+    unsigned span_khz = 50;
+    spec_pc_t *spec = NULL;
 
-    while ((opt = getopt(argc, argv, "p:f:m:t:o:cw:ilh")) != -1) {
+    while ((opt = getopt(argc, argv, "p:f:m:t:o:cw:ilhD:S:P:W")) != -1) {
         switch (opt) {
         case 'p': port = (unsigned)atoi(optarg); break;
         case 'f':
@@ -54,8 +61,12 @@ int main(int argc, char **argv)
         case 'w': pw = optarg; break;
         case 'i': interactive = 1; break;
         case 'l': legacy = 1; break;
+        case 'D': panel = optarg; break;
+        case 'S': span_khz = (unsigned)atoi(optarg); break;
+        case 'P': ppm = optarg; break;
+        case 'W': term = 1; break;
         default:
-            fprintf(stderr, "Aufruf: %s [-p port] [-f kHz] [-m modus] [-t sek] [-o datei.wav] [-c] [-w pw] [-l] [-i] HOST\n", argv[0]);
+            fprintf(stderr, "Aufruf: %s [-p port] [-f kHz] [-m modus] [-t sek] [-o datei.wav] [-c] [-w pw] [-l] [-i] [-D panel [-S kHz] [-P bild.ppm] [-W]] HOST\n", argv[0]);
             return 2;
         }
     }
@@ -85,12 +96,18 @@ int main(int argc, char **argv)
     rc = kiwi_client_connect(&g_client);
     if (rc) { fprintf(stderr, "Verbindung fehlgeschlagen: %s\n", kiwi_strerror(rc)); goto done; }
 
+    if (panel) {
+        if (span_khz < 10 || span_khz > 200) { fprintf(stderr, "-S: 10..200 kHz\n"); goto done; }
+        spec = spec_pc_open(panel, span_khz, ppm, term);
+        if (!spec) goto done;
+    }
     uint32_t t_start = kiwi_time_ms(), t_stat = t_start;
     if (interactive) fprintf(stderr, "Befehle (mit Enter): f <kHz> | m <modus> | s (Status) | q (Ende)\n");
     while (!g_stop) {
         rc = kiwi_client_poll(&g_client, 100);
         if (rc) { fprintf(stderr, "\nBeendet: %s\n", kiwi_strerror(rc)); break; }
 
+        spec_pc_step(spec, &g_client);           /* optional, wartet nie, nicht fatal */
         uint32_t now = kiwi_time_ms();
         if (secs && now - t_start >= secs * 1000u) { ret = 0; break; }
 
@@ -120,7 +137,9 @@ int main(int argc, char **argv)
     fprintf(stderr, "\n");
 
 done:
-    kiwi_client_close(&g_client);   /* IMMER: Close-Frame + TCP schliessen + WAV finalisieren */
+    spec_pc_stop(spec);                      /* W/F vor dem Master schliessen */
+    kiwi_client_close(&g_client);
+    spec_pc_free(spec);   /* IMMER: Close-Frame + TCP schliessen + WAV finalisieren */
     sink_wav_destroy(sink);
     if (ret == 0) fprintf(stderr, "Fertig, Audio in %s\n", out);
     return ret;

@@ -1,6 +1,6 @@
 # KiwiSDR-Client für Raspberry Pi Pico W (RP2040) und Pico 2 W (RP2350)
 
-Port des ESP32-Projekts. **Keine Datei außerhalb von `pico/` wurde verändert**; der Protokollkern
+Port des ESP32-Projekts. Der Port liegt in `pico/` (kleine, mit `CONFIG_KIWI_SPEC` geschützte Ergänzungen für die optionale Spektrumanzeige: siehe Haupt-README 7a); der Protokollkern
 (`components/kiwi_core`, `components/kiwi_dir`) wird als identischer Quellcode mitkompiliert.
 
 ## Was ersetzt wurde (Portierungsschichten)

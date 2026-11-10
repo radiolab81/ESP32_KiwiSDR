@@ -355,6 +355,29 @@ counted and dropped. No automatic update (there is no clock/SNTP) – on command
 
 ---
 
+## 7a Optional spectrum display (SSD1306 / SH1106 / ST7735)
+
+Shows the **current** spectrum around the tuned frequency (default 50 kHz wide = ±25 kHz) on a small display –
+no waterfall history, just for orientation. **Off** by default (no extra display code in the image).
+
+| target | activate | pins/display |
+|---|---|---|
+| ESP32 | `idf.py menuconfig` → *KiwiSDR Client* → *Spektrumanzeige* | Kconfig (`KIWI_SPEC_*`) |
+| Pico | `cmake -DKIWI_SPEC=ON -DKIWI_SPEC_PANEL=ssd1306_i2c …` | `KIWI_SPEC_*` in `pico/CMakeLists.txt` |
+| PC | `./kiwi_pc -D ssd1306 -P bild.ppm -W …` (simuliertes Panel) | `-D ssd1306\|ssd1306spi\|st7735`, `-S kHz` |
+
+
+A second WebSocket `/W/F` is opened with the **same timestamp** as `/SND`; each 1024-bin line is reduced to the
+display width on arrival (max-hold), no frame buffer. **Caveat:** KiwiSDR servers usually reject a second
+*independent* client from the same IP, and busy servers may have no free waterfall channel. `/W/F` is therefore
+optional and non-fatal: on rejection audio continues unchanged, the display shows "NO DATA", and there is no
+retry in that session. Estimated cost (not measured): 3–6 KB RAM, 2–4 KB/s, <1 % CPU.
+**tested on PC** (`make test`: 74 unit checks + end-to-end against a mock); ESP32/Pico glue, HALs and build
+files were not built with IDF/Pico SDK here; 
+**live test:** on real ESP32-/Pico-hardware: Headless, SSD1306 I2C, ST7735 with multiple KiwiSDR server
+
+---
+
 ## 8 TODO
 
 * [x] ~~Automatic synchronisation with a directory service~~ – done in section 7 (manual update,

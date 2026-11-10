@@ -356,6 +356,45 @@ flashen (`idf.py flash`), da sich die Partitionstabelle ändert.
 
 ---
 
+## 7a Optionale Spektrumanzeige (SSD1306 / SH1106 / ST7735)
+
+Zeigt das **aktuelle** Spektrum um die Abstimmfrequenz (Standard 50 kHz breit = ±25 kHz, einstellbar) auf einem
+kleinen Display – ohne Wasserfall-Historie, nur zur Orientierung im Band. Standardmäßig **aus**; dann ist kein
+zusätzlicher Displaycode im Image.
+
+| Ziel | Einschalten | Pins/Display |
+|---|---|---|
+| ESP32 | `idf.py menuconfig` → *KiwiSDR Client* → *Spektrumanzeige* | Kconfig (`KIWI_SPEC_*`) |
+| Pico | `cmake -DKIWI_SPEC=ON -DKIWI_SPEC_PANEL=ssd1306_i2c …` | `KIWI_SPEC_*` in `pico/CMakeLists.txt` |
+| PC | `./kiwi_pc -D ssd1306 -P bild.ppm -W …` (simuliertes Panel) | `-D ssd1306\|ssd1306spi\|st7735`, `-S kHz` |
+
+**Funktionsweise.** Neben `/SND` öffnet der Client einen zweiten WebSocket `/W/F` mit **demselben Zeitstempel**
+(`kiwi_client_t::ts_id`), fordert `zoom`/`start` passend zur Spanne an und reduziert jede 1024-Bin-Zeile sofort auf
+die Displaybreite (Max-Hold). Es gibt keinen Zeilen- oder Bildspeicher: der Renderer liefert Zeile für Zeile
+Palettenindizes, der Treiber packt sie für den Bus (SSD1306: Pages, ST7735: 8-Zeilen-Bänder).
+
+**Wichtig – Zweitverbindung.** KiwiSDR-Server lehnen einen zweiten *unabhängigen* Client derselben IP meist ab, und
+der Mitschnitt zeigt `wf_chans=3` bei 8 Empfangskanälen – ausgelastete Kiwis haben ggf. keinen freien
+Wasserfallkanal. Deshalb gilt: `/W/F` ist **optional und nicht fatal**. Wird er abgelehnt (`too_busy`, `down`,
+Passwort, Redirect, Handshake-Fehler), läuft das Audio unverändert weiter, die Anzeige zeigt „NO DATA“ und es gibt
+**keinen erneuten Versuch in dieser Sitzung**. Bei Netzfehlern: Wartezeit 5/10/20 s, nach 4 Fehlern Verzicht.
+Wer dem Server die Zweitverbindung nicht zumuten will, lässt die Option aus.
+
+**Aufwand (Schätzung, nicht auf Hardware gemessen):** ca. 3–6 KB RAM, 2–4 KB/s WLAN, ADPCM-Dekodierung
+deutlich unter 1 % CPU; Task-Prioritäten liegen unter dem Audio-/Netz-Task.
+
+**Änderungen am Bestand (minimal):** `kiwi_client.h/.c` (+`ts_id`, +`kiwi_mode_passband`; der Pfad nutzt dieselbe
+`ts_id`), `app_main.c` / `main_pico.c` (je +1 Include, 3 Aufrufe in `#ifdef CONFIG_KIWI_SPEC`), Build-Dateien
+(`main/CMakeLists.txt`, `Kconfig.projbuild`, `pico/CMakeLists.txt`, `kiwi_config.h.in`, `pc/Makefile`, `pc/main_pc.c`).
+Alles Neue liegt in `components/kiwi_disp/`, `main/spec_hal_esp32.c`, `pico/spec_hal_pico.c`, `pc/`.
+
+**Getestet (PC):** `make test` – 74 Modultest-Prüfungen (`test_spec`: Zustand, Autoskalierung, Renderer, beide
+Treiber inkl. SPI/I2C/SH1106-/ST7735-Versatz gegen simulierte Panels, die die echten Busbytes dekodieren,
+Fehlerpfade) und ein End-to-End-Test (`e2e_wf_test.py`: gleicher Zeitstempel, Zoom/Start, ADPCM, Trägerposition
+im Bild, Umstimmen, Ablehnung ohne Audio-Störung). *
+**Live getestet:** reale ESP32-/Pico-Hardware: jeweils Headless, SSD1306 I2C, ST7735 mit verschiedenen KiwiSDR Servern
+---
+
 ## 8 TODO
 
 * [x] ~~Automatischer Abgleich mit einem Verzeichnisdienst~~ – umgesetzt in Abschnitt 7 (manuelles Update,

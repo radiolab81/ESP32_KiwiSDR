@@ -12,18 +12,26 @@ DIR  := ../components/kiwi_dir
 CFLAGS += -I$(DIR)/include
 DSRCS := $(wildcard $(DIR)/src/*.c)
 
-all: kiwi_pc test_core kiwi_dirtool test_dir
+# Optionale Spektrumanzeige (SSD1306/ST7735) mit simulierten Panels
+SPEC  := ../components/kiwi_disp
+CFLAGS += -I$(SPEC)/include
+SPSRCS := $(wildcard $(SPEC)/src/kiwi_wf.c $(SPEC)/src/kiwi_spec.c $(SPEC)/src/kiwi_spec_draw.c $(SPEC)/src/kiwi_disp.c $(SPEC)/src/disp_ssd1306.c $(SPEC)/src/disp_st7735.c) sim_panel.c
 
-kiwi_pc: main_pc.c sink_wav.c $(SRCS)
+all: kiwi_pc test_core kiwi_dirtool test_dir test_spec
+
+kiwi_pc: main_pc.c sink_wav.c spec_pc.c $(SPSRCS) $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $^
 
-kiwi_pc_debug: main_pc.c sink_wav.c $(SRCS)
+kiwi_pc_debug: main_pc.c sink_wav.c spec_pc.c $(SPSRCS) $(SRCS)
 	$(CC) $(CFLAGS) -DKIWI_DEBUG -o $@ $^
 
 test_core: test_core.c $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $^
 
 kiwi_dirtool: kiwi_dirtool.c store_file.c $(DSRCS) $(SRCS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+test_spec: test_spec.c $(SPSRCS) $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $^
 
 test_dir: test_dir.c $(DSRCS) $(SRCS)
@@ -34,8 +42,10 @@ test: all
 	python3 e2e_test.py
 	./test_dir
 	python3 e2e_dir_test.py
+	./test_spec
+	python3 e2e_wf_test.py
 
 clean:
-	rm -f kiwi_pc kiwi_pc_debug test_core kiwi_dirtool test_dir *.wav e2e_dir_*.bin
+	rm -f kiwi_pc kiwi_pc_debug test_core kiwi_dirtool test_dir test_spec *.wav *.ppm e2e_dir_*.bin
 
 .PHONY: all test clean
