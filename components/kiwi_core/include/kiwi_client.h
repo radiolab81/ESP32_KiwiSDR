@@ -125,6 +125,9 @@ typedef struct kiwi_client {
     uint32_t audio_rate;
     uint32_t sample_rate_mhz; /**< "sample_rate=" in Milli-Hz (z. B. 11998895) */
     uint32_t foff_hz;        /**< Frequenzversatz des Kiwi (Konverter), Hz     */
+    uint32_t ts_id;          /**< Sitzungskennung im Pfad /ws/kiwi/<ts>/SND. Der optionale Wasserfall-
+                                  *   Client (kiwi_disp) MUSS denselben Wert fuer /W/F nutzen, sonst zaehlt
+                                  *   der Kiwi ihn als zweiten Nutzer derselben IP (und lehnt ihn meist ab). */
     uint32_t ver_maj, ver_min;
     uint32_t t_last_rx, t_last_ka;
 
@@ -179,6 +182,9 @@ int kiwi_client_command(kiwi_client_t *c, const char *line, char *reply,
 
 /** Wandelt "225" / "7055.5" (kHz) nach Hz ohne Gleitkomma. 0 = OK. */
 int kiwi_parse_khz(const char *s, uint32_t *hz);
+
+/** Standard-Durchlassbereich eines Modus in Hz relativ zur Traegerfrequenz. 0 = OK, -1 = unbekannt. */
+int kiwi_mode_passband(const char *mode, int *lo_hz, int *hi_hz);
 
 #ifdef __cplusplus
 }

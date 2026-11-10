@@ -99,4 +99,175 @@ menu "KiwiSDR Client"
 
     endmenu
 
+    menu "Spektrumanzeige (optional)"
+
+        config KIWI_SPEC
+            bool "Spektrum um die Abstimmfrequenz auf einem kleinen Display anzeigen"
+            default n
+            help
+              Oeffnet zusaetzlich zum Audio den Kiwi-Kanal /W/F (zweiter WebSocket
+              mit demselben Sitzungs-Zeitstempel wie das Audio) und zeigt die aktuelle
+              Spektrumzeile (kein Wasserfall) auf einem SSD1306/SH1106 oder ST7735.
+              ACHTUNG: Viele KiwiSDR-Server lehnen eine zweite Verbindung derselben
+              IP ab oder haben keinen freien Wasserfallkanal. Das ist unkritisch:
+              das Audio laeuft unveraendert weiter, die Anzeige zeigt "NO DATA" und es
+              gibt in dieser Sitzung keinen erneuten Versuch. Mehrbedarf ca. 3-6 KB RAM
+              und etwa 2-4 KB/s WLAN-Verkehr. Aus = kein zusaetzlicher Code im Image.
+
+        choice KIWI_SPEC_PANEL
+            prompt "Display"
+            depends on KIWI_SPEC
+            default KIWI_SPEC_PANEL_SSD1306_I2C
+
+            config KIWI_SPEC_PANEL_SSD1306_I2C
+                bool "SSD1306 / SH1106 OLED an I2C"
+            config KIWI_SPEC_PANEL_SSD1306_SPI
+                bool "SSD1306 / SH1106 OLED an SPI (4-Draht, mit D/C)"
+            config KIWI_SPEC_PANEL_ST7735
+                bool "ST7735 TFT an SPI"
+        endchoice
+
+        config KIWI_SPEC_WIDTH
+            int "Anzeigebreite in Pixeln"
+            depends on KIWI_SPEC
+            default 128
+            range 32 160
+
+        config KIWI_SPEC_HEIGHT
+            int "Anzeigehoehe in Pixeln (SSD1306: 32 oder 64; Renderer braucht >= 32)"
+            depends on KIWI_SPEC
+            default 64 if !KIWI_SPEC_PANEL_ST7735
+            default 128
+            range 32 160
+
+        config KIWI_SPEC_SH1106
+            bool "SH1106-Controller (Spaltenversatz 2; nur SSD1306-Typen)"
+            depends on KIWI_SPEC && !KIWI_SPEC_PANEL_ST7735
+            default n
+
+        config KIWI_SPEC_ROTATE180
+            bool "Bild um 180 Grad drehen (nur SSD1306-Typen)"
+            depends on KIWI_SPEC && !KIWI_SPEC_PANEL_ST7735
+            default n
+
+        config KIWI_SPEC_ST7735_INVERT
+            bool "Farben invertieren (manche ST7735-Module)"
+            depends on KIWI_SPEC && KIWI_SPEC_PANEL_ST7735
+            default n
+
+        config KIWI_SPEC_XOFF
+            int "ST7735: X-Versatz im Controller-RAM (z. B. 2 bei 128x160 'Red Tab')"
+            depends on KIWI_SPEC && KIWI_SPEC_PANEL_ST7735
+            default 0
+            range 0 100
+
+        config KIWI_SPEC_YOFF
+            int "ST7735: Y-Versatz im Controller-RAM (z. B. 1 bei 128x160 'Red Tab')"
+            depends on KIWI_SPEC && KIWI_SPEC_PANEL_ST7735
+            default 0
+            range 0 100
+
+        config KIWI_SPEC_SPAN_KHZ
+            int "Dargestellte Gesamtbreite in kHz (50 = +-25 kHz, 100 = +-50 kHz)"
+            depends on KIWI_SPEC
+            default 50
+            range 10 200
+
+        config KIWI_SPEC_FPS
+            int "Anzeige-Wiederholrate (Bilder/s)"
+            depends on KIWI_SPEC
+            default 5
+            range 1 20
+            help
+              I2C-OLED: 1 KB je Bild (ca. 25 ms bei 400 kHz). 5/s sind fuer die
+              Orientierung im Band reichlich und lassen dem Audio Luft.
+
+        config KIWI_SPEC_WF_SPEED
+            int "Kiwi-Zeilenrate (1 = ca. 1/s, 2 = ca. 2/s, 4 = Maximum)"
+            depends on KIWI_SPEC
+            default 2
+            range 1 4
+
+        config KIWI_SPEC_SMOOTH
+            int "Glaettung (0 aus, 1 schwach, 3 stark)"
+            depends on KIWI_SPEC
+            default 1
+            range 0 3
+
+        config KIWI_SPEC_AUTOSCALE
+            bool "Pegelbereich automatisch an Rauschteppich und Spitzen anpassen"
+            depends on KIWI_SPEC
+            default y
+
+        config KIWI_SPEC_DBM_LO
+            int "Fester Bereich: unterer Pegel in dBm (nur ohne Autoskalierung)"
+            depends on KIWI_SPEC && !KIWI_SPEC_AUTOSCALE
+            default -110
+            range -190 0
+
+        config KIWI_SPEC_DBM_HI
+            int "Fester Bereich: oberer Pegel in dBm (nur ohne Autoskalierung)"
+            depends on KIWI_SPEC && !KIWI_SPEC_AUTOSCALE
+            default -20
+            range -190 0
+
+        config KIWI_SPEC_I2C_ADDR
+            hex "I2C-Adresse (7 Bit)"
+            depends on KIWI_SPEC && KIWI_SPEC_PANEL_SSD1306_I2C
+            default 0x3C
+            range 0x3C 0x3D
+
+        config KIWI_SPEC_PIN_SDA
+            int "I2C SDA (GPIO)"
+            depends on KIWI_SPEC && KIWI_SPEC_PANEL_SSD1306_I2C
+            default 21
+            range 0 39
+            help
+              Nicht GPIO25/26 verwenden: dort liegt der Audio-DAC.
+
+        config KIWI_SPEC_PIN_SCL
+            int "I2C SCL (GPIO)"
+            depends on KIWI_SPEC && KIWI_SPEC_PANEL_SSD1306_I2C
+            default 22
+            range 0 39
+
+        config KIWI_SPEC_PIN_SCLK
+            int "SPI SCLK (GPIO)"
+            depends on KIWI_SPEC && !KIWI_SPEC_PANEL_SSD1306_I2C
+            default 18
+            range 0 39
+
+        config KIWI_SPEC_PIN_MOSI
+            int "SPI MOSI/SDA (GPIO)"
+            depends on KIWI_SPEC && !KIWI_SPEC_PANEL_SSD1306_I2C
+            default 23
+            range 0 39
+
+        config KIWI_SPEC_PIN_CS
+            int "SPI CS (GPIO)"
+            depends on KIWI_SPEC && !KIWI_SPEC_PANEL_SSD1306_I2C
+            default 5
+            range 0 39
+
+        config KIWI_SPEC_PIN_DC
+            int "SPI D/C (GPIO)"
+            depends on KIWI_SPEC && !KIWI_SPEC_PANEL_SSD1306_I2C
+            default 16
+            range 0 39
+
+        config KIWI_SPEC_PIN_RST
+            int "Reset (GPIO, -1 = nicht angeschlossen)"
+            depends on KIWI_SPEC && !KIWI_SPEC_PANEL_SSD1306_I2C
+            default 17
+            range -1 39
+
+        config KIWI_SPEC_BUS_HZ
+            int "Bustakt in Hz (I2C: 400000, SPI: bis ca. 20000000)"
+            depends on KIWI_SPEC
+            default 400000 if KIWI_SPEC_PANEL_SSD1306_I2C
+            default 8000000
+            range 100000 40000000
+
+    endmenu
+
 endmenu

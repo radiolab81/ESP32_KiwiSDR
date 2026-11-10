@@ -34,6 +34,9 @@
 #include "kiwi_client.h"
 #include "kiwi_dir_db.h"
 #include "sink_dac.h"
+#ifdef CONFIG_KIWI_SPEC
+#include "kiwi_spec_app.h"      /* optionale Spektrumanzeige */
+#endif
 
 static const char *TAG = "kiwi_app";
 
@@ -140,6 +143,9 @@ static void kiwi_task(void *arg)
         if (rc == KIWI_OK) {
             backoff_ms = 5000;                      /* Verbindung steht -> Wartezeit zuruecksetzen */
             g_active = 1;                           /* ab hier darf die Konsole umstimmen */
+#ifdef CONFIG_KIWI_SPEC
+            kiwi_spec_app_session_start(&g_client);
+#endif
             /* app_dir_switch_pending(): Benutzer hat "d go ..." eingegeben -> Sitzung beenden. */
             while (!g_quit_session && !app_dir_switch_pending() &&
                    (rc = kiwi_client_poll(&g_client, 200)) == KIWI_OK) {
@@ -157,6 +163,9 @@ static void kiwi_task(void *arg)
 #endif
             }
             g_active = 0;
+#ifdef CONFIG_KIWI_SPEC
+            kiwi_spec_app_session_stop();           /* vor kiwi_client_close(): W/F haengt am Master */
+#endif
             /* Zuletzt gewaehlte Abstimmung fuer eine Neuverbindung merken. */
             freq_hz = g_client.cur_freq_hz;
             memcpy(mode, g_client.cur_mode, sizeof mode);
@@ -263,6 +272,9 @@ void app_main(void)
 
     app_dir_init();                               /* Serverdatenbank aus dem Flash oeffnen (leer ist ok) */
     wifi_start();
+#ifdef CONFIG_KIWI_SPEC
+    kiwi_spec_app_init(kiwi_spec_hal_create());   /* Display + Tasks; Fehler sind nicht fatal */
+#endif
     xTaskCreate(kiwi_task, "kiwi_net", 8192, NULL, 5, NULL);
     xTaskCreate(console_task, "console", 6144, NULL, 3, NULL);   /* 6 KB: die d-Befehle formatieren Zeilen */
 }

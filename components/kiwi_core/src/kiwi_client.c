@@ -125,6 +125,15 @@ static const kiwi_mode_def_t *find_mode(const char *name, char norm[8])
     return NULL;
 }
 
+int kiwi_mode_passband(const char *mode, int *lo_hz, int *hi_hz)
+{
+    const kiwi_mode_def_t *m = find_mode(mode, NULL);
+    if (!m) return -1;
+    if (lo_hz) *lo_hz = m->lo;
+    if (hi_hz) *hi_hz = m->hi;
+    return 0;
+}
+
 /** Sendet einen maskierten WebSocket-Frame (Client -> Server). */
 static int send_frame(kiwi_client_t *c, uint8_t op, const uint8_t *pl, size_t n)
 {
@@ -434,8 +443,8 @@ kiwi_err_t kiwi_client_connect(kiwi_client_t *c)
      * aber still ignoriert - genau das Verhalten, das wir beobachtet haben. */
     const char *prefix = c->cfg.path_prefix ? c->cfg.path_prefix : "/ws/kiwi";
     char path[80], origin[112];
-    snprintf(path, sizeof path, "%s/%lu/SND", prefix,
-             (unsigned long)(1000000000u + kiwi_random_u32() % 900000000u));
+    c->ts_id = 1000000000u + kiwi_random_u32() % 900000000u;
+    snprintf(path, sizeof path, "%s/%lu/SND", prefix, (unsigned long)c->ts_id);
     snprintf(origin, sizeof origin, "http://%s:%u", c->cfg.host, (unsigned)c->cfg.port);
     /* rxbuf dient hier als Scratch-Speicher; der WS-Parser nutzt ihn erst spaeter. */
     size_t rl = kiwi_ws_build_request((char *)c->rxbuf, KIWI_RX_BUF_SIZE,
