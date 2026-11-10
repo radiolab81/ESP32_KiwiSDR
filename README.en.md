@@ -360,6 +360,17 @@ counted and dropped. No automatic update (there is no clock/SNTP) – on command
 Shows the **current** spectrum around the tuned frequency (default 50 kHz wide = ±25 kHz) on a small display –
 no waterfall history, just for orientation. **Off** by default (no extra display code in the image).
 
+*PC Version/Simulation*
+
+![PCSIM1](/images/pcsim_ssd1306_spec.jpg)
+![PCSIM2](/images/pcsim_st7735_spec.jpg)
+
+*Real MCU/Display*
+
+![REAL1](/images/real_SSD1306.jpg)
+![REAL2](/images/real_ST7735.jpg)
+
+
 | target | activate | pins/display |
 |---|---|---|
 | ESP32 | `idf.py menuconfig` → *KiwiSDR Client* → *Spektrumanzeige* | Kconfig (`KIWI_SPEC_*`) |
@@ -372,8 +383,10 @@ display width on arrival (max-hold), no frame buffer. **Caveat:** KiwiSDR server
 *independent* client from the same IP, and busy servers may have no free waterfall channel. `/W/F` is therefore
 optional and non-fatal: on rejection audio continues unchanged, the display shows "NO DATA", and there is no
 retry in that session. Estimated cost (not measured): 3–6 KB RAM, 2–4 KB/s, <1 % CPU.
+
 **tested on PC** (`make test`: 74 unit checks + end-to-end against a mock); ESP32/Pico glue, HALs and build
 files were not built with IDF/Pico SDK here; 
+
 **live test:** on real ESP32-/Pico-hardware: Headless, SSD1306 I2C, ST7735 with multiple KiwiSDR server
 
 ---
