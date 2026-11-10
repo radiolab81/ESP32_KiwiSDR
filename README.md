@@ -404,6 +404,7 @@ Alles Neue liegt in `components/kiwi_disp/`, `main/spec_hal_esp32.c`, `pico/spec
 Treiber inkl. SPI/I2C/SH1106-/ST7735-Versatz gegen simulierte Panels, die die echten Busbytes dekodieren,
 Fehlerpfade) und ein End-to-End-Test (`e2e_wf_test.py`: gleicher Zeitstempel, Zoom/Start, ADPCM, Trägerposition
 im Bild, Umstimmen, Ablehnung ohne Audio-Störung). 
+
 **Live getestet:** reale ESP32-/Pico-Hardware: jeweils Headless, SSD1306 I2C, ST7735 mit verschiedenen KiwiSDR Servern
 
 ---
